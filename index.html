@@ -6,27 +6,111 @@
     <title>Магазин</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: system-ui; margin: 0; padding: 16px; background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); }
+        body {
+            font-family: system-ui;
+            margin: 0;
+            padding: 16px;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+        }
         .screen { display: none; }
         .screen.active { display: block; }
-        .product { border-bottom: 1px solid var(--tg-theme-hint-color); padding: 12px 0; display: flex; align-items: center; }
-        .product img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; margin-right: 12px; }
+        .product {
+            border-bottom: 1px solid var(--tg-theme-hint-color);
+            padding: 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .product img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
         .info { flex: 1; }
         .price { font-weight: bold; color: var(--tg-theme-button-color); }
-        button { background: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color); border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; margin: 2px; }
+        button {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 14px;
+        }
+        button:disabled { opacity: 0.5; }
         .hidden { display: none; }
-        input, select { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--tg-theme-hint-color); background: var(--tg-theme-secondary-bg-color); color: inherit; }
-        .admin-form { margin-top: 16px; }
-        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--tg-theme-hint-color); }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 6px 0;
+            box-sizing: border-box;
+            border-radius: 8px;
+            border: 1px solid var(--tg-theme-hint-color);
+            background: var(--tg-theme-secondary-bg-color);
+            color: inherit;
+        }
+        .admin-form {
+            margin-top: 16px;
+            padding: 12px;
+            border: 1px solid var(--tg-theme-hint-color);
+            border-radius: 12px;
+        }
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--tg-theme-hint-color);
+        }
+        .promo-block {
+            background: var(--tg-theme-secondary-bg-color);
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .tabs button {
+            flex: 1;
+            padding: 8px;
+            border-radius: 8px;
+            background: var(--tg-theme-secondary-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+        .tabs button.active {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+        }
+        .manager-link {
+            margin-top: 16px;
+            font-size: 14px;
+            text-align: center;
+            color: var(--tg-theme-hint-color);
+        }
+        .manager-link a {
+            color: var(--tg-theme-link-color);
+        }
     </style>
 </head>
 <body>
     <!-- Экран каталога -->
     <div id="catalog-screen" class="screen active">
         <h2>Каталог</h2>
+        <div id="promo-block" class="promo-block hidden"></div>
         <div id="product-list"></div>
-        <button id="cart-btn">🛒 Корзина (<span id="cart-count">0</span>)</button>
-        <button id="admin-login-btn">🔑 Вход админа</button>
+        <div style="margin-top:16px;">
+            <button id="cart-btn">🛒 Корзина (<span id="cart-count">0</span>)</button>
+            <button id="admin-login-btn">🔑 Вход админа</button>
+        </div>
+        <div class="manager-link">
+            По вопросам: <a href="https://t.me/YOUR_MANAGER_USERNAME" target="_blank">@YOUR_MANAGER_USERNAME</a>
+        </div>
     </div>
 
     <!-- Экран входа админа -->
@@ -40,61 +124,88 @@
     <!-- Экран админ-панели -->
     <div id="admin-screen" class="screen">
         <h3>Админ-панель</h3>
-        <button id="add-product-btn">Добавить товар</button>
-        <button id="add-promo-btn">Создать акцию</button>
-        <button id="logout-admin-btn">Выйти</button>
-        <div id="admin-form-container" class="hidden admin-form"></div>
+        <div class="tabs">
+            <button id="tab-products" class="active">Товары</button>
+            <button id="tab-promos">Акции</button>
+            <button id="tab-orders">Заказы</button>
+            <button id="tab-settings">Настройки</button>
+        </div>
+        <div id="admin-content"></div>
+        <button id="logout-admin-btn" style="margin-top:12px;">Выйти</button>
     </div>
 
     <!-- Экран корзины -->
     <div id="cart-screen" class="screen">
         <h3>Корзина</h3>
         <div id="cart-items"></div>
-        <p>Итого: <span id="total-price">0</span> ₽</p>
+        <p>Итого: <span id="total-price">0</span> Br</p>
         <button id="send-order">Оформить заказ</button>
         <button id="back-from-cart">← Назад</button>
     </div>
 
     <script>
-        // ========== ЗАМЕНИ НА СВОИ ДАННЫЕ ==========
+        // ========== НАСТРОЙКИ (ЗАМЕНИ НА СВОИ) ==========
         const FIREBASE_API_KEY = 'AIzaSyDIefINisA7dpIovRQO6vI2vbwlKvzHhVA';
         const DATABASE_URL = 'https://vape-shop-bot-default-rtdb.europe-west1.firebasedatabase.app/';
-        // ===========================================
+        const MANAGER_USERNAME = '@your_manager'; // <-- Впиши юзернейм менеджера
+        // ===============================================
 
         window.Telegram.WebApp.ready();
         const tg = window.Telegram.WebApp;
 
-        const ADMIN_PASSWORD = 'qwerty'; // Задай свой пароль здесь
-
         let cart = [];
+        let productsCache = [];
+        let promosCache = [];
+        let ordersCache = [];
 
-        // Показ экранов
+        // ---------- УТИЛИТЫ ----------
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
+            if (id === 'catalog-screen') {
+                loadProductsAndPromos();
+            }
+            if (id === 'cart-screen') {
+                renderCart();
+            }
+            if (id === 'admin-screen') {
+                // По умолчанию показать товары
+                switchAdminTab('products');
+            }
         }
 
-        // Загрузка товаров из Firebase
-        async function loadProducts() {
-            const res = await fetch(`${DATABASE_URL}/products.json`);
-            const data = await res.json();
-            const products = data ? Object.entries(data).map(([id, p]) => ({ id, ...p })) : [];
-            renderProducts(products);
+        // ---------- ЗАГРУЗКА ДАННЫХ ----------
+        async function loadProductsAndPromos() {
+            try {
+                const [prodRes, promoRes] = await Promise.all([
+                    fetch(`${DATABASE_URL}/products.json`),
+                    fetch(`${DATABASE_URL}/promos.json`)
+                ]);
+                const prodData = await prodRes.json();
+                const promoData = await promoRes.json();
+                productsCache = prodData ? Object.entries(prodData).map(([id, p]) => ({ id, ...p })) : [];
+                promosCache = promoData ? Object.entries(promoData).map(([id, p]) => ({ id, ...p })) : [];
+            } catch (e) {
+                productsCache = [];
+                promosCache = [];
+            }
+            renderCatalog();
+            renderPromos();
         }
 
-        function renderProducts(products) {
+        function renderCatalog() {
             const container = document.getElementById('product-list');
-            if (products.length === 0) {
+            if (productsCache.length === 0) {
                 container.innerHTML = '<p>Товары пока не добавлены</p>';
                 return;
             }
-            container.innerHTML = products.map(p => `
+            container.innerHTML = productsCache.map(p => `
                 <div class="product">
-                    <img src="${p.img}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/60'">
+                    <img src="${p.img || 'https://via.placeholder.com/60'}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/60'">
                     <div class="info">
                         <div><strong>${p.name}</strong></div>
                         <div>${p.desc || ''}</div>
-                        <div class="price">${p.price} ₽</div>
+                        <div class="price">${p.price} Br</div>
                         ${p.stock <= 0 ? '<span style="color:red">Нет в наличии</span>' : ''}
                     </div>
                     <button onclick="addToCart('${p.id}')" ${p.stock <= 0 ? 'disabled' : ''}>В корзину</button>
@@ -102,14 +213,25 @@
             `).join('');
         }
 
-        // Корзина
-        function addToCart(id) {
-            fetch(`${DATABASE_URL}/products/${id}.json`).then(r => r.json()).then(p => {
-                if (p && p.stock > 0) {
-                    cart.push({ ...p, id });
-                    updateCartUI();
-                }
-            });
+        function renderPromos() {
+            const block = document.getElementById('promo-block');
+            if (promosCache.length === 0) {
+                block.classList.add('hidden');
+                return;
+            }
+            block.classList.remove('hidden');
+            block.innerHTML = `<strong>🎉 Акции:</strong><br>` +
+                promosCache.map(p => `🔥 ${p.name} — скидка ${p.discount}%`).join('<br>');
+        }
+
+        // ---------- КОРЗИНА ----------
+        function addToCart(productId) {
+            const product = productsCache.find(p => p.id === productId);
+            if (product && product.stock > 0) {
+                cart.push({ ...product });
+                updateCartUI();
+                tg.HapticFeedback.notification('success');
+            }
         }
 
         function removeFromCart(index) {
@@ -121,7 +243,7 @@
         function updateCartUI() {
             document.getElementById('cart-count').textContent = cart.length;
             const total = cart.reduce((sum, item) => sum + item.price, 0);
-            document.getElementById('total-price').textContent = total;
+            document.getElementById('total-price').textContent = total + ' Br';
         }
 
         function renderCart() {
@@ -132,105 +254,286 @@
             }
             container.innerHTML = cart.map((item, i) => `
                 <div class="cart-item">
-                    <span>${item.name} - ${item.price}₽</span>
+                    <span>${item.name} — ${item.price} Br</span>
                     <button onclick="removeFromCart(${i})">❌</button>
                 </div>
             `).join('');
+            updateCartUI();
         }
 
-        // Оформление заказа
-        document.getElementById('send-order').addEventListener('click', () => {
+        // ---------- ОФОРМЛЕНИЕ ЗАКАЗА ----------
+        document.getElementById('send-order').addEventListener('click', async () => {
             if (cart.length === 0) return tg.showAlert('Корзина пуста');
-            const order = cart.map(item => item.name).join(', ');
+            const orderId = 'ORD-' + Date.now().toString(36).toUpperCase();
+            const items = cart.map(item => item.name).join(', ');
             const total = cart.reduce((s, item) => s + item.price, 0);
-            tg.sendData(JSON.stringify({ order, total }));
+            const orderData = {
+                orderId,
+                items,
+                total,
+                timestamp: Date.now()
+            };
+
+            // Отправить боту
+            tg.sendData(JSON.stringify(orderData));
+
+            // Сохранить в Firebase
+            try {
+                await fetch(`${DATABASE_URL}/orders.json`, {
+                    method: 'POST',
+                    body: JSON.stringify(orderData)
+                });
+            } catch (e) {
+                console.error('Не удалось сохранить заказ', e);
+            }
+
+            // Очистить корзину
             cart = [];
             updateCartUI();
             renderCart();
             showScreen('catalog-screen');
-            tg.showAlert('Заказ отправлен!');
+            tg.showAlert(`Заказ №${orderId} оформлен! Мы свяжемся с вами.`);
         });
 
-        // Админка
-        document.getElementById('login-submit').addEventListener('click', () => {
+        // ---------- АДМИНКА ----------
+        // Проверка пароля через Firebase
+        document.getElementById('login-submit').addEventListener('click', async () => {
             const pass = document.getElementById('admin-password').value.trim();
-            if (pass === ADMIN_PASSWORD) {
-                showScreen('admin-screen');
-                document.getElementById('admin-password').value = '';
-            } else {
-                tg.showAlert('Неверный пароль');
+            try {
+                const res = await fetch(`${DATABASE_URL}/settings/adminPassword.json`);
+                const correctPass = await res.json();
+                if (pass === correctPass) {
+                    showScreen('admin-screen');
+                    document.getElementById('admin-password').value = '';
+                } else {
+                    tg.showAlert('Неверный пароль');
+                }
+            } catch (e) {
+                tg.showAlert('Ошибка проверки пароля');
             }
         });
 
-        document.getElementById('logout-admin-btn').addEventListener('click', () => showScreen('catalog-screen'));
+        document.getElementById('logout-admin-btn').addEventListener('click', () => {
+            showScreen('catalog-screen');
+        });
 
-        // Показать форму добавления товара
-        document.getElementById('add-product-btn').addEventListener('click', () => {
-            const container = document.getElementById('admin-form-container');
-            container.classList.remove('hidden');
-            container.innerHTML = `
+        // Переключение вкладок в админке
+        document.querySelectorAll('.tabs button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                switchAdminTab(this.id.replace('tab-', ''));
+            });
+        });
+
+        async function switchAdminTab(tab) {
+            const container = document.getElementById('admin-content');
+            switch (tab) {
+                case 'products':
+                    container.innerHTML = '<button id="add-product-btn">+ Добавить товар</button><div id="product-admin-list"></div>';
+                    document.getElementById('add-product-btn').addEventListener('click', showAddProductForm);
+                    loadAdminProducts();
+                    break;
+                case 'promos':
+                    container.innerHTML = '<button id="add-promo-btn">+ Добавить акцию</button><div id="promo-admin-list"></div>';
+                    document.getElementById('add-promo-btn').addEventListener('click', showAddPromoForm);
+                    loadAdminPromos();
+                    break;
+                case 'orders':
+                    container.innerHTML = '<div id="orders-list">Загрузка...</div>';
+                    loadAdminOrders();
+                    break;
+                case 'settings':
+                    container.innerHTML = `
+                        <div class="admin-form">
+                            <h4>Сменить пароль админа</h4>
+                            <input type="password" id="new-password" placeholder="Новый пароль">
+                            <button id="save-password">Сохранить</button>
+                        </div>
+                        <div class="admin-form">
+                            <h4>Изменить username менеджера</h4>
+                            <input type="text" id="new-manager" placeholder="@manager">
+                            <button id="save-manager">Сохранить</button>
+                            <p><small>После смены обновите страницу</small></p>
+                        </div>
+                    `;
+                    document.getElementById('save-password').addEventListener('click', async () => {
+                        const newPass = document.getElementById('new-password').value.trim();
+                        if (!newPass) return tg.showAlert('Введите пароль');
+                        await fetch(`${DATABASE_URL}/settings/adminPassword.json`, {
+                            method: 'PUT',
+                            body: JSON.stringify(newPass)
+                        });
+                        tg.showAlert('Пароль обновлён');
+                    });
+                    document.getElementById('save-manager').addEventListener('click', async () => {
+                        const newManager = document.getElementById('new-manager').value.trim();
+                        if (!newManager) return tg.showAlert('Введите username');
+                        // Обновим на странице, но для надёжности можно сохранить в Firebase
+                        // и при загрузке читать оттуда. Пока просто меняем на лету.
+                        document.querySelector('.manager-link a').textContent = newManager;
+                        document.querySelector('.manager-link a').href = `https://t.me/${newManager.replace('@', '')}`;
+                        tg.showAlert('Менеджер обновлён (до перезагрузки)');
+                    });
+                    break;
+            }
+        }
+
+        // Админ-функции для товаров
+        async function loadAdminProducts() {
+            const listDiv = document.getElementById('product-admin-list');
+            if (!listDiv) return;
+            const res = await fetch(`${DATABASE_URL}/products.json`);
+            const data = await res.json();
+            const products = data ? Object.entries(data).map(([id, p]) => ({ id, ...p })) : [];
+            listDiv.innerHTML = products.map(p => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--tg-theme-hint-color);">
+                    <span>${p.name} (${p.price} Br)</span>
+                    <button onclick="deleteProduct('${p.id}')">❌</button>
+                </div>
+            `).join('');
+            if (products.length === 0) listDiv.innerHTML = '<p>Нет товаров</p>';
+        }
+
+        async function deleteProduct(id) {
+            await fetch(`${DATABASE_URL}/products/${id}.json`, { method: 'DELETE' });
+            tg.showAlert('Товар удалён');
+            loadAdminProducts();
+            loadProductsAndPromos(); // обновить каталог
+        }
+
+        function showAddProductForm() {
+            const container = document.getElementById('product-admin-list');
+            const form = document.createElement('div');
+            form.className = 'admin-form';
+            form.innerHTML = `
                 <h4>Новый товар</h4>
                 <input id="prod-name" placeholder="Название">
                 <input id="prod-desc" placeholder="Описание">
-                <input id="prod-price" type="number" placeholder="Цена">
+                <input id="prod-price" type="number" placeholder="Цена (BYN)">
                 <input id="prod-img" placeholder="URL картинки">
                 <input id="prod-stock" type="number" placeholder="Остаток" value="10">
-                <button id="save-product">Сохранить товар</button>
+                <button id="save-product">Сохранить</button>
             `;
+            container.prepend(form);
             document.getElementById('save-product').addEventListener('click', async () => {
-                const name = document.getElementById('prod-name').value;
-                const desc = document.getElementById('prod-desc').value;
+                const name = document.getElementById('prod-name').value.trim();
+                const desc = document.getElementById('prod-desc').value.trim();
                 const price = Number(document.getElementById('prod-price').value);
-                const img = document.getElementById('prod-img').value;
+                const img = document.getElementById('prod-img').value.trim();
                 const stock = Number(document.getElementById('prod-stock').value);
                 if (!name || !price) return tg.showAlert('Название и цена обязательны');
-                const product = { name, desc, price, img, stock };
-                const res = await fetch(`${DATABASE_URL}/products.json`, {
+                await fetch(`${DATABASE_URL}/products.json`, {
                     method: 'POST',
-                    body: JSON.stringify(product)
+                    body: JSON.stringify({ name, desc, price, img, stock })
                 });
-                if (res.ok) {
-                    tg.showAlert('Товар добавлен');
-                    container.classList.add('hidden');
-                    loadProducts(); // обновить каталог
-                } else {
-                    tg.showAlert('Ошибка');
-                }
+                tg.showAlert('Товар добавлен');
+                form.remove();
+                loadAdminProducts();
+                loadProductsAndPromos();
             });
-        });
+        }
 
-        // Форма акции (упрощённо)
-        document.getElementById('add-promo-btn').addEventListener('click', () => {
-            const container = document.getElementById('admin-form-container');
-            container.classList.remove('hidden');
-            container.innerHTML = `
+        // Админ-функции для акций
+        async function loadAdminPromos() {
+            const listDiv = document.getElementById('promo-admin-list');
+            if (!listDiv) return;
+            const res = await fetch(`${DATABASE_URL}/promos.json`);
+            const data = await res.json();
+            const promos = data ? Object.entries(data).map(([id, p]) => ({ id, ...p })) : [];
+            listDiv.innerHTML = promos.map(p => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--tg-theme-hint-color);">
+                    <span>${p.name} (${p.discount}%)</span>
+                    <button onclick="deletePromo('${p.id}')">❌</button>
+                </div>
+            `).join('');
+            if (promos.length === 0) listDiv.innerHTML = '<p>Нет акций</p>';
+        }
+
+        async function deletePromo(id) {
+            await fetch(`${DATABASE_URL}/promos/${id}.json`, { method: 'DELETE' });
+            tg.showAlert('Акция удалена');
+            loadAdminPromos();
+            loadProductsAndPromos();
+        }
+
+        function showAddPromoForm() {
+            const container = document.getElementById('promo-admin-list');
+            const form = document.createElement('div');
+            form.className = 'admin-form';
+            form.innerHTML = `
                 <h4>Новая акция</h4>
-                <input id="promo-name" placeholder="Название акции">
+                <input id="promo-name" placeholder="Название">
                 <input id="promo-discount" type="number" placeholder="Скидка %">
-                <button id="save-promo">Сохранить акцию</button>
+                <button id="save-promo">Сохранить</button>
             `;
+            container.prepend(form);
             document.getElementById('save-promo').addEventListener('click', async () => {
-                const name = document.getElementById('promo-name').value;
+                const name = document.getElementById('promo-name').value.trim();
                 const discount = Number(document.getElementById('promo-discount').value);
                 if (!name || !discount) return tg.showAlert('Название и скидка обязательны');
-                const promo = { name, discount };
-                await fetch(`${DATABASE_URL}/promos.json`, { method: 'POST', body: JSON.stringify(promo) });
-                tg.showAlert('Акция сохранена');
-                container.classList.add('hidden');
+                await fetch(`${DATABASE_URL}/promos.json`, {
+                    method: 'POST',
+                    body: JSON.stringify({ name, discount })
+                });
+                tg.showAlert('Акция добавлена');
+                form.remove();
+                loadAdminPromos();
+                loadProductsAndPromos();
             });
-        });
+        }
+
+        // Заказы
+        async function loadAdminOrders() {
+            const listDiv = document.getElementById('orders-list');
+            if (!listDiv) return;
+            try {
+                const res = await fetch(`${DATABASE_URL}/orders.json`);
+                const data = await res.json();
+                const orders = data ? Object.entries(data).map(([id, o]) => ({ id, ...o })) : [];
+                orders.sort((a, b) => b.timestamp - a.timestamp); // новые сверху
+                listDiv.innerHTML = orders.map(o => `
+                    <div class="admin-form">
+                        <strong>№${o.orderId}</strong><br>
+                        Товары: ${o.items}<br>
+                        Сумма: ${o.total} Br<br>
+                        <small>${new Date(o.timestamp).toLocaleString()}</small>
+                    </div>
+                `).join('');
+                if (orders.length === 0) listDiv.innerHTML = '<p>Заказов пока нет</p>';
+            } catch (e) {
+                listDiv.innerHTML = '<p>Ошибка загрузки</p>';
+            }
+        }
+
+        // ---------- ПЕРВИЧНАЯ ИНИЦИАЛИЗАЦИЯ ----------
+        async function createDefaultPasswordIfNeeded() {
+            try {
+                const res = await fetch(`${DATABASE_URL}/settings/adminPassword.json`);
+                const data = await res.json();
+                if (!data) {
+                    // Устанавливаем пароль по умолчанию 'admin', если его нет
+                    await fetch(`${DATABASE_URL}/settings/adminPassword.json`, {
+                        method: 'PUT',
+                        body: JSON.stringify('admin')
+                    });
+                }
+            } catch (e) {}
+        }
 
         // Навигация
-        document.getElementById('cart-btn').addEventListener('click', () => {
-            renderCart();
-            showScreen('cart-screen');
-        });
+        document.getElementById('cart-btn').addEventListener('click', () => showScreen('cart-screen'));
         document.getElementById('back-from-cart').addEventListener('click', () => showScreen('catalog-screen'));
         document.getElementById('admin-login-btn').addEventListener('click', () => showScreen('login-screen'));
         document.getElementById('back-to-catalog-from-login').addEventListener('click', () => showScreen('catalog-screen'));
 
         // Старт
-        loadProducts();
+        createDefaultPasswordIfNeeded();
+        loadProductsAndPromos();
+        // Обновляем ссылку на менеджера из переменной
+        const managerLink = document.querySelector('.manager-link a');
+        managerLink.href = `https://t.me/${MANAGER_USERNAME.replace('@', '')}`;
+        managerLink.textContent = MANAGER_USERNAME;
     </script>
 </body>
 </html>
