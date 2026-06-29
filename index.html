@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Магазин</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: system-ui; margin: 0; padding: 16px; background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .product { border-bottom: 1px solid var(--tg-theme-hint-color); padding: 12px 0; display: flex; align-items: center; }
+        .product img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; margin-right: 12px; }
+        .info { flex: 1; }
+        .price { font-weight: bold; color: var(--tg-theme-button-color); }
+        button { background: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color); border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; margin: 2px; }
+        .hidden { display: none; }
+        input, select { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--tg-theme-hint-color); background: var(--tg-theme-secondary-bg-color); color: inherit; }
+        .admin-form { margin-top: 16px; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--tg-theme-hint-color); }
+    </style>
+</head>
+<body>
+    <!-- Экран каталога -->
+    <div id="catalog-screen" class="screen active">
+        <h2>Каталог</h2>
+        <div id="product-list"></div>
+        <button id="cart-btn">🛒 Корзина (<span id="cart-count">0</span>)</button>
+        <button id="admin-login-btn">🔑 Вход админа</button>
+    </div>
+
+    <!-- Экран входа админа -->
+    <div id="login-screen" class="screen">
+        <h3>Пароль админа</h3>
+        <input type="password" id="admin-password" placeholder="Пароль">
+        <button id="login-submit">Войти</button>
+        <button id="back-to-catalog-from-login">← Назад</button>
+    </div>
+
+    <!-- Экран админ-панели -->
+    <div id="admin-screen" class="screen">
+        <h3>Админ-панель</h3>
+        <button id="add-product-btn">Добавить товар</button>
+        <button id="add-promo-btn">Создать акцию</button>
+        <button id="logout-admin-btn">Выйти</button>
+        <div id="admin-form-container" class="hidden admin-form"></div>
+    </div>
+
+    <!-- Экран корзины -->
+    <div id="cart-screen" class="screen">
+        <h3>Корзина</h3>
+        <div id="cart-items"></div>
+        <p>Итого: <span id="total-price">0</span> ₽</p>
+        <button id="send-order">Оформить заказ</button>
+        <button id="back-from-cart">← Назад</button>
+    </div>
+
+    <script>
+        // ========== ЗАМЕНИ НА СВОИ ДАННЫЕ ==========
+        const FIREBASE_API_KEY = 'AIzaSyDIefINisA7dpIovRQO6vI2vbwlKvzHhVA';
+        const DATABASE_URL = 'https://vape-shop-bot-default-rtdb.europe-west1.firebasedatabase.app/';
+        // ===========================================
+
+        window.Telegram.WebApp.ready();
+        const tg = window.Telegram.WebApp;
+
+        const ADMIN_PASSWORD = 'qwerty'; // Задай свой пароль здесь
+
+        let cart = [];
+
+        // Показ экранов
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // Загрузка товаров из Firebase
+        async function loadProducts() {
+            const res = await fetch(`${DATABASE_URL}/products.json`);
+            const data = await res.json();
+            const products = data ? Object.entries(data).map(([id, p]) => ({ id, ...p })) : [];
+            renderProducts(products);
+        }
+
+        function renderProducts(products) {
+            const container = document.getElementById('product-list');
+            if (products.length === 0) {
+                container.innerHTML = '<p>Товары пока не добавлены</p>';
+                return;
+            }
+            container.innerHTML = products.map(p => `
+                <div class="product">
+                    <img src="${p.img}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/60'">
+                    <div class="info">
+                        <div><strong>${p.name}</strong></div>
+                        <div>${p.desc || ''}</div>
+                        <div class="price">${p.price} ₽</div>
+                        ${p.stock <= 0 ? '<span style="color:red">Нет в наличии</span>' : ''}
+                    </div>
+                    <button onclick="addToCart('${p.id}')" ${p.stock <= 0 ? 'disabled' : ''}>В корзину</button>
+                </div>
+            `).join('');
+        }
+
+        // Корзина
+        function addToCart(id) {
+            fetch(`${DATABASE_URL}/products/${id}.json`).then(r => r.json()).then(p => {
+                if (p && p.stock > 0) {
+                    cart.push({ ...p, id });
+                    updateCartUI();
+                }
+            });
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            updateCartUI();
+            renderCart();
+        }
+
+        function updateCartUI() {
+            document.getElementById('cart-count').textContent = cart.length;
+            const total = cart.reduce((sum, item) => sum + item.price, 0);
+            document.getElementById('total-price').textContent = total;
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items');
+            if (cart.length === 0) {
+                container.innerHTML = '<p>Корзина пуста</p>';
+                return;
+            }
+            container.innerHTML = cart.map((item, i) => `
+                <div class="cart-item">
+                    <span>${item.name} - ${item.price}₽</span>
+                    <button onclick="removeFromCart(${i})">❌</button>
+                </div>
+            `).join('');
+        }
+
+        // Оформление заказа
+        document.getElementById('send-order').addEventListener('click', () => {
+            if (cart.length === 0) return tg.showAlert('Корзина пуста');
+            const order = cart.map(item => item.name).join(', ');
+            const total = cart.reduce((s, item) => s + item.price, 0);
+            tg.sendData(JSON.stringify({ order, total }));
+            cart = [];
+            updateCartUI();
+            renderCart();
+            showScreen('catalog-screen');
+            tg.showAlert('Заказ отправлен!');
+        });
+
+        // Админка
+        document.getElementById('login-submit').addEventListener('click', () => {
+            const pass = document.getElementById('admin-password').value.trim();
+            if (pass === ADMIN_PASSWORD) {
+                showScreen('admin-screen');
+                document.getElementById('admin-password').value = '';
+            } else {
+                tg.showAlert('Неверный пароль');
+            }
+        });
+
+        document.getElementById('logout-admin-btn').addEventListener('click', () => showScreen('catalog-screen'));
+
+        // Показать форму добавления товара
+        document.getElementById('add-product-btn').addEventListener('click', () => {
+            const container = document.getElementById('admin-form-container');
+            container.classList.remove('hidden');
+            container.innerHTML = `
+                <h4>Новый товар</h4>
+                <input id="prod-name" placeholder="Название">
+                <input id="prod-desc" placeholder="Описание">
+                <input id="prod-price" type="number" placeholder="Цена">
+                <input id="prod-img" placeholder="URL картинки">
+                <input id="prod-stock" type="number" placeholder="Остаток" value="10">
+                <button id="save-product">Сохранить товар</button>
+            `;
+            document.getElementById('save-product').addEventListener('click', async () => {
+                const name = document.getElementById('prod-name').value;
+                const desc = document.getElementById('prod-desc').value;
+                const price = Number(document.getElementById('prod-price').value);
+                const img = document.getElementById('prod-img').value;
+                const stock = Number(document.getElementById('prod-stock').value);
+                if (!name || !price) return tg.showAlert('Название и цена обязательны');
+                const product = { name, desc, price, img, stock };
+                const res = await fetch(`${DATABASE_URL}/products.json`, {
+                    method: 'POST',
+                    body: JSON.stringify(product)
+                });
+                if (res.ok) {
+                    tg.showAlert('Товар добавлен');
+                    container.classList.add('hidden');
+                    loadProducts(); // обновить каталог
+                } else {
+                    tg.showAlert('Ошибка');
+                }
+            });
+        });
+
+        // Форма акции (упрощённо)
+        document.getElementById('add-promo-btn').addEventListener('click', () => {
+            const container = document.getElementById('admin-form-container');
+            container.classList.remove('hidden');
+            container.innerHTML = `
+                <h4>Новая акция</h4>
+                <input id="promo-name" placeholder="Название акции">
+                <input id="promo-discount" type="number" placeholder="Скидка %">
+                <button id="save-promo">Сохранить акцию</button>
+            `;
+            document.getElementById('save-promo').addEventListener('click', async () => {
+                const name = document.getElementById('promo-name').value;
+                const discount = Number(document.getElementById('promo-discount').value);
+                if (!name || !discount) return tg.showAlert('Название и скидка обязательны');
+                const promo = { name, discount };
+                await fetch(`${DATABASE_URL}/promos.json`, { method: 'POST', body: JSON.stringify(promo) });
+                tg.showAlert('Акция сохранена');
+                container.classList.add('hidden');
+            });
+        });
+
+        // Навигация
+        document.getElementById('cart-btn').addEventListener('click', () => {
+            renderCart();
+            showScreen('cart-screen');
+        });
+        document.getElementById('back-from-cart').addEventListener('click', () => showScreen('catalog-screen'));
+        document.getElementById('admin-login-btn').addEventListener('click', () => showScreen('login-screen'));
+        document.getElementById('back-to-catalog-from-login').addEventListener('click', () => showScreen('catalog-screen'));
+
+        // Старт
+        loadProducts();
+    </script>
+</body>
+</html>
