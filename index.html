@@ -27,6 +27,7 @@
             height: 60px;
             object-fit: cover;
             border-radius: 8px;
+            background: var(--tg-theme-secondary-bg-color);
         }
         .info { flex: 1; }
         .price { font-weight: bold; color: var(--tg-theme-button-color); }
@@ -109,7 +110,7 @@
             <button id="admin-login-btn">🔑 Вход админа</button>
         </div>
         <div class="manager-link">
-            По вопросам: <a href="https://t.me/YOUR_MANAGER_USERNAME" target="_blank">@YOUR_MANAGER_USERNAME</a>
+            По вопросам: <a href="https://t.me/furi1234" target="_blank">@furi1234</a>
         </div>
     </div>
 
@@ -144,11 +145,11 @@
     </div>
 
     <script>
-        // ========== НАСТРОЙКИ (ЗАМЕНИ НА СВОИ) ==========
-        const FIREBASE_API_KEY = 'AIzaSyDIefINisA7dpIovRQO6vI2vbwlKvzHhVA';
+        // ========== НАСТРОЙКИ ==========
         const DATABASE_URL = 'https://vape-shop-bot-default-rtdb.europe-west1.firebasedatabase.app/';
-        const MANAGER_USERNAME = '@your_manager'; // <-- Впиши юзернейм менеджера
-        // ===============================================
+        const ADMIN_PASSWORD = 'qwerty'; // Пароль администратора
+        const MANAGER_USERNAME = '@furi1234'; // Юзернейм менеджера
+        // ===============================
 
         window.Telegram.WebApp.ready();
         const tg = window.Telegram.WebApp;
@@ -156,7 +157,6 @@
         let cart = [];
         let productsCache = [];
         let promosCache = [];
-        let ordersCache = [];
 
         // ---------- УТИЛИТЫ ----------
         function showScreen(id) {
@@ -169,7 +169,6 @@
                 renderCart();
             }
             if (id === 'admin-screen') {
-                // По умолчанию показать товары
                 switchAdminTab('products');
             }
         }
@@ -201,7 +200,7 @@
             }
             container.innerHTML = productsCache.map(p => `
                 <div class="product">
-                    <img src="${p.img || 'https://via.placeholder.com/60'}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/60'">
+                    <img src="${p.img && p.img.trim() !== '' ? p.img : 'https://via.placeholder.com/60'}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/60'">
                     <div class="info">
                         <div><strong>${p.name}</strong></div>
                         <div>${p.desc || ''}</div>
@@ -264,9 +263,11 @@
         // ---------- ОФОРМЛЕНИЕ ЗАКАЗА ----------
         document.getElementById('send-order').addEventListener('click', async () => {
             if (cart.length === 0) return tg.showAlert('Корзина пуста');
+            
             const orderId = 'ORD-' + Date.now().toString(36).toUpperCase();
             const items = cart.map(item => item.name).join(', ');
             const total = cart.reduce((s, item) => s + item.price, 0);
+            
             const orderData = {
                 orderId,
                 items,
@@ -274,42 +275,34 @@
                 timestamp: Date.now()
             };
 
-            // Отправить боту
+            // Отправляем данные боту в Telegram
             tg.sendData(JSON.stringify(orderData));
 
-            // Сохранить в Firebase
+            // Сохраняем в Firebase для истории заказов в админке
             try {
                 await fetch(`${DATABASE_URL}/orders.json`, {
                     method: 'POST',
                     body: JSON.stringify(orderData)
                 });
             } catch (e) {
-                console.error('Не удалось сохранить заказ', e);
+                console.error('Не удалось сохранить заказ в базу', e);
             }
 
-            // Очистить корзину
             cart = [];
             updateCartUI();
             renderCart();
             showScreen('catalog-screen');
-            tg.showAlert(`Заказ №${orderId} оформлен! Мы свяжемся с вами.`);
+            tg.showAlert(`Заказ №${orderId} успешно оформлен!`);
         });
 
         // ---------- АДМИНКА ----------
-        // Проверка пароля через Firebase
-        document.getElementById('login-submit').addEventListener('click', async () => {
+        document.getElementById('login-submit').addEventListener('click', () => {
             const pass = document.getElementById('admin-password').value.trim();
-            try {
-                const res = await fetch(`${DATABASE_URL}/settings/adminPassword.json`);
-                const correctPass = await res.json();
-                if (pass === correctPass) {
-                    showScreen('admin-screen');
-                    document.getElementById('admin-password').value = '';
-                } else {
-                    tg.showAlert('Неверный пароль');
-                }
-            } catch (e) {
-                tg.showAlert('Ошибка проверки пароля');
+            if (pass === ADMIN_PASSWORD) {
+                showScreen('admin-screen');
+                document.getElementById('admin-password').value = '';
+            } else {
+                tg.showAlert('Неверный пароль');
             }
         });
 
@@ -317,7 +310,6 @@
             showScreen('catalog-screen');
         });
 
-        // Переключение вкладок в админке
         document.querySelectorAll('.tabs button').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
@@ -346,40 +338,15 @@
                 case 'settings':
                     container.innerHTML = `
                         <div class="admin-form">
-                            <h4>Сменить пароль админа</h4>
-                            <input type="password" id="new-password" placeholder="Новый пароль">
-                            <button id="save-password">Сохранить</button>
-                        </div>
-                        <div class="admin-form">
-                            <h4>Изменить username менеджера</h4>
-                            <input type="text" id="new-manager" placeholder="@manager">
-                            <button id="save-manager">Сохранить</button>
-                            <p><small>После смены обновите страницу</small></p>
+                            <h4>Настройки</h4>
+                            <p>Пароль администратора: <code>qwerty</code></p>
+                            <p>Менеджер: <strong>${MANAGER_USERNAME}</strong></p>
                         </div>
                     `;
-                    document.getElementById('save-password').addEventListener('click', async () => {
-                        const newPass = document.getElementById('new-password').value.trim();
-                        if (!newPass) return tg.showAlert('Введите пароль');
-                        await fetch(`${DATABASE_URL}/settings/adminPassword.json`, {
-                            method: 'PUT',
-                            body: JSON.stringify(newPass)
-                        });
-                        tg.showAlert('Пароль обновлён');
-                    });
-                    document.getElementById('save-manager').addEventListener('click', async () => {
-                        const newManager = document.getElementById('new-manager').value.trim();
-                        if (!newManager) return tg.showAlert('Введите username');
-                        // Обновим на странице, но для надёжности можно сохранить в Firebase
-                        // и при загрузке читать оттуда. Пока просто меняем на лету.
-                        document.querySelector('.manager-link a').textContent = newManager;
-                        document.querySelector('.manager-link a').href = `https://t.me/${newManager.replace('@', '')}`;
-                        tg.showAlert('Менеджер обновлён (до перезагрузки)');
-                    });
                     break;
             }
         }
 
-        // Админ-функции для товаров
         async function loadAdminProducts() {
             const listDiv = document.getElementById('product-admin-list');
             if (!listDiv) return;
@@ -399,7 +366,7 @@
             await fetch(`${DATABASE_URL}/products/${id}.json`, { method: 'DELETE' });
             tg.showAlert('Товар удалён');
             loadAdminProducts();
-            loadProductsAndPromos(); // обновить каталог
+            loadProductsAndPromos();
         }
 
         function showAddProductForm() {
@@ -411,7 +378,7 @@
                 <input id="prod-name" placeholder="Название">
                 <input id="prod-desc" placeholder="Описание">
                 <input id="prod-price" type="number" placeholder="Цена (BYN)">
-                <input id="prod-img" placeholder="URL картинки">
+                <input id="prod-img" placeholder="Прямая ссылка на картинку (https://...)">
                 <input id="prod-stock" type="number" placeholder="Остаток" value="10">
                 <button id="save-product">Сохранить</button>
             `;
@@ -434,7 +401,6 @@
             });
         }
 
-        // Админ-функции для акций
         async function loadAdminPromos() {
             const listDiv = document.getElementById('promo-admin-list');
             if (!listDiv) return;
@@ -483,7 +449,6 @@
             });
         }
 
-        // Заказы
         async function loadAdminOrders() {
             const listDiv = document.getElementById('orders-list');
             if (!listDiv) return;
@@ -491,7 +456,7 @@
                 const res = await fetch(`${DATABASE_URL}/orders.json`);
                 const data = await res.json();
                 const orders = data ? Object.entries(data).map(([id, o]) => ({ id, ...o })) : [];
-                orders.sort((a, b) => b.timestamp - a.timestamp); // новые сверху
+                orders.sort((a, b) => b.timestamp - a.timestamp);
                 listDiv.innerHTML = orders.map(o => `
                     <div class="admin-form">
                         <strong>№${o.orderId}</strong><br>
@@ -506,34 +471,16 @@
             }
         }
 
-        // ---------- ПЕРВИЧНАЯ ИНИЦИАЛИЗАЦИЯ ----------
-        async function createDefaultPasswordIfNeeded() {
-            try {
-                const res = await fetch(`${DATABASE_URL}/settings/adminPassword.json`);
-                const data = await res.json();
-                if (!data) {
-                    // Устанавливаем пароль по умолчанию 'admin', если его нет
-                    await fetch(`${DATABASE_URL}/settings/adminPassword.json`, {
-                        method: 'PUT',
-                        body: JSON.stringify('admin')
-                    });
-                }
-            } catch (e) {}
-        }
-
-        // Навигация
+        // ---------- ИНИЦИАЛИЗАЦИЯ ----------
+        loadProductsAndPromos();
         document.getElementById('cart-btn').addEventListener('click', () => showScreen('cart-screen'));
         document.getElementById('back-from-cart').addEventListener('click', () => showScreen('catalog-screen'));
         document.getElementById('admin-login-btn').addEventListener('click', () => showScreen('login-screen'));
         document.getElementById('back-to-catalog-from-login').addEventListener('click', () => showScreen('catalog-screen'));
 
-        // Старт
-        createDefaultPasswordIfNeeded();
-        loadProductsAndPromos();
-        // Обновляем ссылку на менеджера из переменной
         const managerLink = document.querySelector('.manager-link a');
-        managerLink.href = `https://t.me/${MANAGER_USERNAME.replace('@', '')}`;
-        managerLink.textContent = MANAGER_USERNAME;
+        managerLink.href = `https://t.me/furi1234`;
+        managerLink.textContent = `@furi1234`;
     </script>
 </body>
 </html>
